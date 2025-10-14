@@ -1,7 +1,5 @@
-// components/DGDashboard.tsx
 'use client';
 
-import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +10,6 @@ import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, 
 import { DashboardData, User } from '@/types/srap';
 import KPIManagement from '@/components/kpi-management';
 import PillarManagement from '@/components/pillar-management';
-
 
 interface DGDashboardProps {
   data: DashboardData;
@@ -41,30 +38,58 @@ const getStatusBadgeColor = (status: string) => {
   }
 };
 
-const COLORS = ['#004225', '#005c35', '#008751', '#4CAF50', '#81C784', '#A5D6A7', '#FFC107', '#FF5722'];
+// Map status to hex colors for Recharts (Tailwind classes won't work as fill)
+const getStatusHexColor = (status: string) => {
+  switch (status) {
+    case 'excellent': return '#22c55e'; // green-500
+    case 'good': return '#86efac'; // green-400
+    case 'fair': return '#eab308'; // yellow-500
+    case 'poor': return '#f97316'; // orange-500
+    case 'critical': return '#ef4444'; // red-500
+    default: return '#9ca3af'; // gray-400
+  }
+};
 
 export default function DGDashboard({ data, user }: DGDashboardProps) {
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const overallScore = Math.round(data?.pillars.reduce((sum, pillar) => sum + pillar.overallScore, 0) / data?.pillars.length);
+  // Guard: If data is invalid, show loading/fallback
+  if (!data || !data.pillars) {
+    return (
+      <div className="space-y-6 p-6">
+        <Card>
+          <CardContent className="p-6 text-center text-gray-500">
+            No dashboard data available. Please check your connection or try again later.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  const chartData = data?.pillars.map(pillar => ({
+  const pillars = data.pillars ?? []; // Safe default
+  const overallScore = pillars.length > 0 
+    ? Math.round(pillars.reduce((sum, pillar) => sum + (pillar.overallScore ?? 0), 0) / pillars.length)
+    : 0;
+
+  const chartData = pillars.map(pillar => ({
     name: pillar.name.replace(' & ', '\n& '),
-    score: pillar.overallScore,
-    status: pillar.status
+    score: pillar.overallScore ?? 0,
+    status: pillar.status ?? 'unknown'
   }));
 
-  const statusDistribution = data?.pillars.reduce((acc, pillar) => {
-    acc[pillar.status] = (acc[pillar.status] || 0) + 1;
+  const statusDistribution = pillars.reduce((acc, pillar) => {
+    const status = pillar.status ?? 'unknown';
+    acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   const pieData = Object.entries(statusDistribution).map(([status, count]) => ({
     name: status.charAt(0).toUpperCase() + status.slice(1),
     value: count,
-    color: getStatusColor(status).replace('bg-', '')
+    hexColor: getStatusHexColor(status)
   }));
 
-  const completionRate = Math.round((data.completedKPIs / data.totalKPIs) * 100);
+  const completedKPIs = data.completedKPIs ?? 0;
+  const totalKPIs = data.totalKPIs ?? 0;
+  const completionRate = totalKPIs > 0 ? Math.round((completedKPIs / totalKPIs) * 100) : 0;
 
   return (
     <div className="space-y-6 p-6">
@@ -116,7 +141,7 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
               <div>
                 <p className="text-sm text-gray-600">KPI Completion</p>
                 <p className="text-3xl text-[var(--nigeria-green)]">{completionRate}%</p>
-                <p className="text-xs text-gray-500">{data.completedKPIs}/{data.totalKPIs} KPIs</p>
+                <p className="text-xs text-gray-500">{completedKPIs}/{totalKPIs} KPIs</p>
               </div>
               <CheckCircle className="h-8 w-8 text-[var(--nigeria-green)]" />
             </div>
@@ -128,7 +153,7 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Pillars</p>
-                <p className="text-3xl text-[var(--nigeria-green)]">{data.pillars.length}</p>
+                <p className="text-3xl text-[var(--nigeria-green)]">{pillars.length}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-[var(--nigeria-green)]" />
             </div>
@@ -177,7 +202,7 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
           <Card>
             <CardHeader>
               <CardTitle>Pillar Performance Overview</CardTitle>
-              <CardDescription>Current scores across all 8 SRAP 2.0 pillars</CardDescription>
+              <CardDescription>Current scores by pillar</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -214,11 +239,11 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
                     labelLine={false}
                     label={({ name, value }) => `${name}: ${value}`}
                     outerRadius={80}
-                    fill="#8884d8"
+                   
                     dataKey="value"
                   >
                     {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={`#${entry.color.replace(/^(bg|text)-/, '')}`} />
+                      <Cell key={`cell-${index}`} fill={entry.hexColor} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -229,22 +254,22 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
         </TabsContent>
 
         <TabsContent value="pillars" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.pillars.map((pillar) => (
+          <div className="grid grid-cols-1 md.cols-2 lg:grid-cols-3 gap-4">
+            {pillars.map((pillar) => (
               <Card key={pillar.id} className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{pillar.name}</CardTitle>
-                    <Badge className={getStatusBadgeColor(pillar.status)}>
-                      {pillar.status.charAt(0).toUpperCase() + pillar.status.slice(1)}
+                    <Badge className={getStatusBadgeColor(pillar.status ?? 'unknown')}>
+                      { (pillar.status ?? 'unknown').charAt(0).toUpperCase() + (pillar.status ?? 'unknown').slice(1)}
                     </Badge>
                   </div>
-                  <CardDescription className="text-xs">{pillar.description}</CardDescription>
+                  <CardDescription className="text-xs">{pillar.description ?? ''}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-2xl text-[var(--nigeria-green)]">{pillar.overallScore}%</span>
+                      <span className="text-2xl text-[var(--nigeria-green)]">{pillar.overallScore ?? 0}%</span>
                       {pillar?.overallScore >= 70 ? (
                         <TrendingUp className="h-5 w-5 text-green-500" />
                       ) : pillar?.overallScore >= 50 ? (
@@ -253,9 +278,9 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
                         <TrendingDown className="h-5 w-5 text-red-500" />
                       )}
                     </div>
-                    <Progress value={pillar?.overallScore} className="h-2" />
+                    <Progress value={pillar?.overallScore ?? 0} className="h-2" />
                     <div className="text-xs text-gray-500">
-                      {pillar?.kpis?.length} KPIs • {pillar?.objectives?.length} Objectives
+                      {(pillar?.kpis?.length ?? 0)} KPIs • {(pillar?.objectives?.length ?? 0)} Objectives
                     </div>
                   </div>
                 </CardContent>
@@ -286,8 +311,8 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
         {user?.permissions.canManageKPIs && (
           <TabsContent value="kpi-management">
             <KPIManagement
-              kpis={data?.pillars.flatMap(pillar => pillar.kpis)}
-              pillars={data?.pillars}
+              kpis={pillars.flatMap(pillar => pillar.kpis ?? [])}
+              pillars={pillars}
               user={user}
               onCreateKPI={(kpiData) => {
                 console.log('Creating KPI:', kpiData);
@@ -306,8 +331,8 @@ export default function DGDashboard({ data, user }: DGDashboardProps) {
         {user?.permissions.canManagePillars && (
           <TabsContent value="pillar-management">
             <PillarManagement
-              pillars={data.pillars}
-              kpis={data.pillars.flatMap(pillar => pillar.kpis)}
+              pillars={pillars}
+              kpis={pillars.flatMap(pillar => pillar.kpis ?? [])}
               user={user}
               onCreatePillar={(pillarData) => {
                 console.log('Creating pillar:', pillarData);
