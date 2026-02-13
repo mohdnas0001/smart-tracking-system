@@ -7,14 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Target, Settings, Shield } from 'lucide-react';
-import { DashboardData, User } from '@/types/srap';
 import KPIManagement from '@/components/kpi-management';
 import PillarManagement from '@/components/pillar-management';
-
-interface DGDashboardProps {
-  data: DashboardData;
-  user?: User;
-}
+import { mockDashboardData } from '@/data/mockData';
+import { useAuth } from '@/lib/auth-context';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -50,7 +46,10 @@ const getStatusHexColor = (status: string) => {
   }
 };
 
-export default function DGDashboard({ data, user }: DGDashboardProps) {
+export default function DGDashboard() {
+  const { user } = useAuth();
+  const data = mockDashboardData;
+
   // Guard: If data is invalid, show loading/fallback
   if (!data || !data.pillars) {
     return (

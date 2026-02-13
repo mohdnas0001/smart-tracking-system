@@ -77,6 +77,8 @@ export interface DashboardData {
 
 export interface User {
   username: string;
+  fullName?: string;
+  email?: string;
   role: 'dg' | 'director' | 'desk-officer' | 'cps' | 'strategy-team';
   department?: string;
   permissions: {

@@ -55,9 +55,11 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
-      }}
+        Chevron: (props) => {
+          if (props.orientation === "left") return <ChevronLeft className="h-4 w-4" />;
+          return <ChevronRight className="h-4 w-4" />;
+        },
+      } as Partial<Record<string, React.ComponentType<any>>>}
       {...props}
     />
   );
